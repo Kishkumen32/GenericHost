@@ -9,22 +9,29 @@ namespace TwitchBot
 {
     class Program
     {
-        public static IConfiguration Configuration => 
-            new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json")
-            .AddEnvironmentVariables().Build();
+        #region Configuration
+        public static Action<IConfigurationBuilder> BuildConfiguration =
+            builder => builder.SetBasePath(Directory.GetCurrentDirectory())
+                              .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                              .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Production"}.json", optional: true)
+                              .AddEnvironmentVariables();
+        #endregion
 
         public static async Task Main(string[] args)
         {
+            var builder = new ConfigurationBuilder();
+            BuildConfiguration(builder);
+
             Log.Logger = new LoggerConfiguration()
-                            .ReadFrom.Configuration(Configuration)
+                            .ReadFrom.Configuration(builder.Build())
                             .Enrich.FromLogContext()
                             .WriteTo.Console()
                             .CreateLogger();
 
             try
             {
+                Log.Information("Starting host");
+
                 var host = CreateHostBuilder(args).Build();
 
                 await host.RunAsync();
@@ -41,7 +48,6 @@ namespace TwitchBot
 
         private static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
-                .UseSerilog()
                 .ConfigureHostConfiguration(configHost =>
                 {
                     configHost.SetBasePath(Directory.GetCurrentDirectory());
@@ -59,6 +65,7 @@ namespace TwitchBot
                 .ConfigureServices((hostContext, services) =>
                 {
 
-                });
+                })
+                .UseSerilog();
     }
 }
